@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,18 +35,9 @@ import com.example.revdev.data.AuthViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? = null) {
-    val user = remember {
-        User(
-            id = "1",
-            name = "Vivek Kumar",
-            email = "vivek@example.com",
-            quizHistory = listOf(
-                QuizResult("1", "HTML Basics", 8, 10, System.currentTimeMillis() - 86400000, 1200000),
-                QuizResult("2", "CSS Fundamentals", 7, 10, System.currentTimeMillis() - 172800000, 900000),
-                QuizResult("3", "JavaScript Intro", 6, 10, System.currentTimeMillis() - 259200000, 1500000)
-            )
-        )
-    }
+    val firebaseUser = authViewModel?.currentUser
+    val userName = firebaseUser?.displayName ?: "User"
+    val userEmail = firebaseUser?.email ?: ""
     
     val courses = remember {
         listOf(
@@ -69,59 +61,107 @@ fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? =
                             DarkPrimary,
                             DarkPrimaryContainer
                         )
-                    )
+                    ),
+                    shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp)
                 )
-                .padding(24.dp)
+                .padding(0.dp)
         ) {
+            // Soft fade overlay for depth
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                DarkPrimary.copy(alpha = 0.15f),
+                                DarkPrimaryContainer.copy(alpha = 0.05f)
+                            )
+                        )
+                    )
+            )
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 36.dp, bottom = 28.dp)
             ) {
-                // Profile Picture
+                // Profile Picture with gradient border and shadow
                 Box(
                     modifier = Modifier
-                        .size(100.dp)
+                        .size(110.dp)
                         .background(
-                            color = DarkOnPrimary.copy(alpha = 0.2f),
+                            brush = Brush.radialGradient(
+                                colors = listOf(DarkPrimary, DarkPrimaryContainer, DarkOnPrimary.copy(alpha = 0.1f)),
+                                radius = 80f
+                            ),
                             shape = CircleShape
                         )
+                        .padding(6.dp)
+                        .shadow(10.dp, CircleShape, clip = false)
                         .clip(CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = DarkOnPrimary
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(98.dp)
+                            .background(
+                                color = DarkOnPrimary.copy(alpha = 0.2f),
+                                shape = CircleShape
+                            )
+                            .clip(CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(54.dp),
+                            tint = DarkOnPrimary
+                        )
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
+                Spacer(modifier = Modifier.height(18.dp))
                 Text(
-                    text = user.name,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold
+                    text = userName,
+                    style = MaterialTheme.typography.headlineLarge.copy(
+                        fontWeight = FontWeight.ExtraBold
                     ),
                     color = DarkOnPrimary
                 )
-                
                 Text(
-                    text = user.email,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = userEmail,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = DarkOnPrimary.copy(alpha = 0.8f)
                 )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Quick Stats
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+                Spacer(modifier = Modifier.height(28.dp))
+                // Stats Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f),
+                    colors = CardDefaults.cardColors(
+                        containerColor = DarkOnPrimary.copy(alpha = 0.10f)
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = CardDefaults.cardElevation(8.dp)
                 ) {
-                    StatItem("Courses", courses.size.toString())
-                    StatItem("Quizzes", user.quizHistory.size.toString())
-                    StatItem("Avg Score", "${user.quizHistory.map { it.score * 10 / it.totalQuestions }.average().toInt()}%")
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 22.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem("Courses", courses.size.toString())
+                        StatItem("Quizzes", "0")
+                        StatItem("Avg Score", "0%")
+                    }
                 }
+                Spacer(modifier = Modifier.height(10.dp))
+                Divider(
+                    modifier = Modifier
+                        .fillMaxWidth(0.7f)
+                        .padding(top = 2.dp),
+                    color = DarkOnPrimary.copy(alpha = 0.15f),
+                    thickness = 1.dp
+                )
             }
         }
         
@@ -156,10 +196,9 @@ fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? =
                     color = DarkOnBackground
                 )
             }
-            
-            items(user.quizHistory) { quiz ->
-                QuizHistoryCard(quiz = quiz)
-            }
+            // items(user.quizHistory) { quiz ->
+            //     QuizHistoryCard(quiz = quiz)
+            // }
             
             // Settings Section
             item {

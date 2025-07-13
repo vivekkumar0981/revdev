@@ -136,6 +136,7 @@ fun RevdevNavigation() {
                     currentRoute = Screen.Home.route
                 ) { modifier ->
                     HomeScreen(
+                        authViewModel = authViewModel,
                         onNavigateToQuiz = { navController.navigate(route = Screen.Quiz.route) },
                         onNavigateToAITutor = { navController.navigate(route = Screen.AITutor.route) },
                         onNavigateToResumeReview = { navController.navigate(route = Screen.ResumeReview.route) },

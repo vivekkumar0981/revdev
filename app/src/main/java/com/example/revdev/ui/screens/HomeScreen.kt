@@ -20,17 +20,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.revdev.ui.components.*
 import com.example.revdev.ui.theme.*
+import com.example.revdev.data.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    authViewModel: AuthViewModel,
     onNavigateToQuiz: () -> Unit,
     onNavigateToAITutor: () -> Unit,
     onNavigateToResumeReview: () -> Unit,
     onNavigateToCourseSelection: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val userName = "Vivek"
+    val userName = authViewModel.currentUser?.displayName ?: "User"
     
     Column(
         modifier = modifier

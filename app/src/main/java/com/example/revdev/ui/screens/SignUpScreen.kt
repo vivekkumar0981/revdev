@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ fun SignUpScreen(
     onNavigateBack: () -> Unit
 ) {
     var email by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     val authState by authViewModel.authState.collectAsState()
@@ -95,6 +97,13 @@ fun SignUpScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     CustomTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = "Username",
+                        leadingIcon = Icons.Default.Person
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    CustomTextField(
                         value = email,
                         onValueChange = { email = it },
                         label = "Email",
@@ -121,11 +130,11 @@ fun SignUpScreen(
                     PrimaryButton(
                         text = if (isLoading) "Signing Up..." else "Sign Up",
                         onClick = {
-                            if (password == confirmPassword && email.isNotEmpty() && password.isNotEmpty()) {
-                                authViewModel.signup(email, password)
+                            if (password == confirmPassword && email.isNotEmpty() && password.isNotEmpty() && username.isNotEmpty()) {
+                                authViewModel.signup(email, username, password)
                             }
                         },
-                        enabled = email.isNotEmpty() && password.isNotEmpty() && confirmPassword.isNotEmpty() && !isLoading && password == confirmPassword
+                        enabled = email.isNotEmpty() && username.isNotEmpty() && password.isNotEmpty() && confirmPassword.isNotEmpty() && !isLoading && password == confirmPassword
                     )
                     if (errorMessage != null) {
                         Spacer(modifier = Modifier.height(8.dp))
