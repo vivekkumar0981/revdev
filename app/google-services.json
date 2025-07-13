@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "583135305423",
+    "project_id": "revdev-453bd",
+    "storage_bucket": "revdev-453bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:583135305423:android:82f9ec820229611a9721ba",
+        "android_client_info": {
+          "package_name": "com.example.revdev"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "583135305423-3o5979vqj4335u98vci9niqpuusl2tbu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCwTgViuYsC8gxTrWR6pRYsLDhPRSbffF8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "583135305423-3o5979vqj4335u98vci9niqpuusl2tbu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
