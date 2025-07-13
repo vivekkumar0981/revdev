@@ -39,7 +39,6 @@ fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? =
             id = "1",
             name = "Vivek Kumar",
             email = "vivek@example.com",
-            courseProgress = mapOf("html_css" to 75, "javascript" to 30),
             quizHistory = listOf(
                 QuizResult("1", "HTML Basics", 8, 10, System.currentTimeMillis() - 86400000, 1200000),
                 QuizResult("2", "CSS Fundamentals", 7, 10, System.currentTimeMillis() - 172800000, 900000),
@@ -143,9 +142,9 @@ fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? =
                 )
             }
             
-            items(courses) { course ->
-                CourseProgressCard(course = course)
-            }
+            // items(courses) { course ->
+            //     CourseProgressCard(course = course)
+            // }
             
             // Quiz History Section
             item {
@@ -206,87 +205,6 @@ private fun StatItem(
             style = MaterialTheme.typography.bodySmall,
             color = DarkOnPrimary.copy(alpha = 0.8f)
         )
-    }
-}
-
-@Composable
-private fun CourseProgressCard(course: Course) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = DarkCardBackground
-        ),
-        shape = RoundedCornerShape(16.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = course.title,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = DarkOnSurface
-                    )
-                    
-                    Text(
-                        text = course.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = DarkOnSurfaceVariant
-                    )
-                }
-                
-                Icon(
-                    imageVector = Icons.Default.Home,
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            color = DarkPrimaryContainer,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .padding(8.dp),
-                    tint = DarkOnPrimaryContainer
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${course.completedLessons}/${course.totalLessons} lessons",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = DarkOnSurfaceVariant
-                )
-                
-                Text(
-                    text = "${course.progress}%",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = DarkPrimary
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            ProgressBar(
-                progress = course.progress / 100f,
-                color = DarkPrimary
-            )
-        }
     }
 }
 

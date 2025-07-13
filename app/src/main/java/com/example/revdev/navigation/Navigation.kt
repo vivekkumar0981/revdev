@@ -31,6 +31,7 @@ import com.example.revdev.ui.screens.*
 import com.google.firebase.auth.FirebaseAuth
 import com.example.revdev.data.AuthViewModel
 import com.example.revdev.data.AuthState
+import com.example.revdev.data.CourseViewModel
 
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
@@ -42,8 +43,9 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object AITutor : Screen("ai_tutor", "AI Tutor", Icons.Default.Email)
     object ResumeReview : Screen("resume_review", "Resume", Icons.Default.AccountCircle)
     object Profile : Screen("profile", "Profile", Icons.Default.AccountCircle)
-    object CourseSelection : Screen("course_selection", "Courses", Icons.Default.AddCircle)
+    object CourseSelection : Screen("course_selection", "Courses", Icons.Default.Settings)
     object CourseDetail : Screen("course_detail/{courseId}", "Course Detail", Icons.Default.CheckCircle)
+    object LessonViewer : Screen("lesson_viewer/{courseId}/{lessonId}", "Lesson", Icons.Default.Settings)
 }
 
 val bottomNavItems = listOf(
@@ -58,7 +60,11 @@ val bottomNavItems = listOf(
 fun RevdevNavigation() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
+    val courseViewModel: CourseViewModel = viewModel()
     val authState by authViewModel.authState.collectAsState()
+    val courses by courseViewModel.courses.collectAsState()
+    val currentCourse by courseViewModel.currentCourse.collectAsState()
+    val currentLesson by courseViewModel.currentLesson.collectAsState()
 
     // Check auth state on app start
     LaunchedEffect(Unit) {
@@ -175,13 +181,8 @@ fun RevdevNavigation() {
                     navController = navController,
                     currentRoute = Screen.CourseSelection.route
                 ) { modifier ->
-                    val courses = listOf(
-                        com.example.revdev.ui.screens.CourseProgress("html", "HTML", "Learn HTML from scratch", 75),
-                        com.example.revdev.ui.screens.CourseProgress("css", "CSS", "Master CSS styling", 30),
-                        com.example.revdev.ui.screens.CourseProgress("js", "JavaScript", "JavaScript programming", 10)
-                    )
                     CourseSelectionScreen(
-                        courses = courses,
+                        courses = courses ?: emptyList(),
                         onCourseClick = { course -> navController.navigate("course_detail/${course.id}") },
                         modifier = modifier
                     )
@@ -192,11 +193,87 @@ fun RevdevNavigation() {
                 arguments = listOf(navArgument("courseId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val courseId = backStackEntry.arguments?.getString("courseId") ?: ""
-                MainScreen(
-                    navController = navController,
-                    currentRoute = "course_detail/$courseId"
-                ) { modifier ->
-                    com.example.revdev.ui.screens.CourseDetailScreen(courseId = courseId, modifier = modifier)
+                val course = courses.find { it.id == courseId }
+                
+                if (course != null) {
+                    MainScreen(
+                        navController = navController,
+                        currentRoute = "course_detail/$courseId"
+                    ) { modifier ->
+                        CourseDetailScreen(
+                            course = course,
+                            onLessonClick = { lesson ->
+                                courseViewModel.selectLesson(lesson.id)
+                                navController.navigate("lesson_viewer/$courseId/${lesson.id}")
+                            },
+                            modifier = modifier
+                        )
+                    }
+                } else {
+                    // Handle course not found
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Course not found")
+                    }
+                }
+            }
+            composable(
+                route = "lesson_viewer/{courseId}/{lessonId}",
+                arguments = listOf(
+                    navArgument("courseId") { type = NavType.StringType },
+                    navArgument("lessonId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val courseId = backStackEntry.arguments?.getString("courseId") ?: ""
+                val lessonId = backStackEntry.arguments?.getString("lessonId") ?: ""
+                
+                val course = courses.find { it.id == courseId }
+                val lesson = course?.lessons?.find { it.id == lessonId }
+                
+                if (lesson != null) {
+                    MainScreen(
+                        navController = navController,
+                        currentRoute = "lesson_viewer/$courseId/$lessonId"
+                    ) { modifier ->
+                        val nextLesson = courseViewModel.getNextLesson()
+                        val previousLesson = courseViewModel.getPreviousLesson()
+                        
+                        LessonViewerScreen(
+                            lesson = lesson,
+                            onNextLesson = {
+                                nextLesson?.let { next ->
+                                    courseViewModel.selectLesson(next.id)
+                                    navController.navigate("lesson_viewer/$courseId/${next.id}") {
+                                        popUpTo("lesson_viewer/$courseId/$lessonId") { inclusive = true }
+                                    }
+                                }
+                            },
+                            onPreviousLesson = {
+                                previousLesson?.let { prev ->
+                                    courseViewModel.selectLesson(prev.id)
+                                    navController.navigate("lesson_viewer/$courseId/${prev.id}") {
+                                        popUpTo("lesson_viewer/$courseId/$lessonId") { inclusive = true }
+                                    }
+                                }
+                            },
+                            onMarkCompleted = {
+                                courseViewModel.markLessonAsCompleted(lessonId)
+                            },
+                            hasNextLesson = nextLesson != null,
+                            hasPreviousLesson = previousLesson != null,
+                            modifier = modifier
+                        )
+                    }
+                } else {
+                    // Handle lesson not found
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Lesson not found")
+                    }
                 }
             }
         }

@@ -22,10 +22,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.revdev.data.ChatMessage
+import com.example.revdev.data.OpenAIApi
 import com.example.revdev.ui.components.*
 import com.example.revdev.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,6 +36,8 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     var inputText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
+    var cooldownSeconds by remember { mutableStateOf(0) }
+    var streamingMessage by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     
@@ -45,6 +50,14 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                 isUser = false
             )
         )
+    }
+
+    // Cooldown timer effect
+    LaunchedEffect(cooldownSeconds) {
+        if (cooldownSeconds > 0) {
+            kotlinx.coroutines.delay(1000)
+            cooldownSeconds--
+        }
     }
     
     Column(
@@ -116,7 +129,17 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                 ChatMessageItem(message = message)
             }
             
-            if (isLoading) {
+            if (isLoading && streamingMessage != null) {
+                item {
+                    ChatMessageItem(
+                        message = ChatMessage(
+                            id = "streaming",
+                            content = streamingMessage ?: "",
+                            isUser = false
+                        )
+                    )
+                }
+            } else if (isLoading) {
                 item {
                     TypingIndicator()
                 }
@@ -160,7 +183,7 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                 
                 FloatingActionButton(
                     onClick = {
-                        if (inputText.isNotBlank() && !isLoading) {
+                        if (!isLoading && cooldownSeconds == 0 && inputText.isNotBlank()) {
                             val userMessage = ChatMessage(
                                 id = System.currentTimeMillis().toString(),
                                 content = inputText,
@@ -170,29 +193,57 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                             val currentInput = inputText
                             inputText = ""
                             isLoading = true
-                            
+                            streamingMessage = ""
                             coroutineScope.launch {
-                                delay(1500) // Simulate AI thinking
-                                val aiResponse = generateAIResponse(currentInput)
-                                val aiMessage = ChatMessage(
-                                    id = System.currentTimeMillis().toString(),
-                                    content = aiResponse,
-                                    isUser = false
-                                )
-                                messages = messages + aiMessage
-                                isLoading = false
-                                listState.animateScrollToItem(messages.size - 1)
+                                try {
+                                    var lastText = ""
+                                    val aiResponse = OpenAIApi.askStream(currentInput) { partialText ->
+                                        streamingMessage = partialText
+                                        lastText = partialText
+                                    }
+                                    if (aiResponse.contains("Rate limit exceeded")) {
+                                        cooldownSeconds = 10 // 10 second cooldown
+                                        val errorMsg = ChatMessage(
+                                            id = System.currentTimeMillis().toString(),
+                                            content = "You are sending requests too quickly or have reached your usage limit. Please wait $cooldownSeconds seconds before trying again.",
+                                            isUser = false
+                                        )
+                                        messages = messages + errorMsg
+                                    } else {
+                                        val aiMessage = ChatMessage(
+                                            id = System.currentTimeMillis().toString(),
+                                            content = lastText,
+                                            isUser = false
+                                        )
+                                        messages = messages + aiMessage
+                                    }
+                                } catch (e: Exception) {
+                                    val errorMsg = ChatMessage(
+                                        id = System.currentTimeMillis().toString(),
+                                        content = "AI error: ${e.message}",
+                                        isUser = false
+                                    )
+                                    messages = messages + errorMsg
+                                } finally {
+                                    isLoading = false
+                                    streamingMessage = null
+                                    listState.animateScrollToItem(messages.size - 1)
+                                }
                             }
                         }
                     },
                     modifier = Modifier.size(48.dp),
-                    containerColor = DarkPrimary,
+                    containerColor = if (cooldownSeconds > 0 || isLoading) DarkOnSurfaceVariant else DarkPrimary,
                     contentColor = DarkOnPrimary
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "Send"
-                    )
+                    if (cooldownSeconds > 0) {
+                        Text("${cooldownSeconds}s")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send"
+                        )
+                    }
                 }
             }
         }
@@ -322,34 +373,6 @@ private fun TypingIndicator() {
                     )
                 }
             }
-        }
-    }
-}
-
-private fun generateAIResponse(userInput: String): String {
-    val lowerInput = userInput.lowercase()
-    
-    return when {
-        lowerInput.contains("html") && lowerInput.contains("what") -> {
-            "HTML (HyperText Markup Language) is the standard markup language for creating web pages. It describes the structure of a web page semantically and originally included cues for the appearance of the document."
-        }
-        lowerInput.contains("css") && lowerInput.contains("what") -> {
-            "CSS (Cascading Style Sheets) is a style sheet language used for describing the presentation of a document written in HTML. CSS describes how elements should be rendered on screen, on paper, in speech, or on other media."
-        }
-        lowerInput.contains("div") -> {
-            "The `<div>` element is a block-level container used to group other HTML elements. It's commonly used for layout purposes and can be styled with CSS. For example: `<div class=\"container\">Content here</div>`"
-        }
-        lowerInput.contains("flexbox") || lowerInput.contains("flex") -> {
-            "Flexbox is a CSS layout model that allows you to design flexible responsive layouts. It provides an efficient way to distribute space among items in a container and align them. Use `display: flex` to create a flex container."
-        }
-        lowerInput.contains("grid") -> {
-            "CSS Grid is a two-dimensional layout system designed for the web. It lets you lay out items in rows and columns, and has many features that make building complex layouts straightforward."
-        }
-        lowerInput.contains("responsive") -> {
-            "Responsive design ensures that web pages look good on all devices. Use media queries, flexible grids, and responsive images. Start with mobile-first design and use `@media` queries to adapt for larger screens."
-        }
-        else -> {
-            "That's a great question! I'd be happy to help you with HTML, CSS, or web development concepts. Could you provide more specific details about what you'd like to learn?"
         }
     }
 } 

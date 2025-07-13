@@ -5,10 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Person
+
+import androidx.compose.material.icons.filled.Settings
 
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -25,22 +23,12 @@ import com.example.revdev.ui.theme.DarkBackground
 import com.example.revdev.ui.theme.DarkCardBackground
 import com.example.revdev.ui.theme.DarkOnSurface
 import com.example.revdev.ui.theme.DarkPrimary
-
-// Dummy data class for course progress
-// In real app, pass this from ViewModel or parent
-
-
-data class CourseProgress(
-    val id: String,
-    val title: String,
-    val description: String,
-    val progress: Int // percent
-)
+import com.example.revdev.data.Course
 
 @Composable
 fun CourseSelectionScreen(
-    courses: List<CourseProgress>,
-    onCourseClick: (CourseProgress) -> Unit,
+    courses: List<Course>,
+    onCourseClick: (Course) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -71,10 +59,10 @@ fun CourseSelectionScreen(
                 ) {
                     Icon(
                         imageVector = when (course.id) {
-                            "html" -> Icons.Filled.CheckCircle
-                            "css" -> Icons.Filled.Person
-                            "js" -> Icons.Filled.AccountBox
-                            else -> Icons.Filled.AccountCircle
+                            "html" -> Icons.Filled.Settings
+                            "css" -> Icons.Filled.Settings
+                            "js" -> Icons.Filled.Settings
+                            else -> Icons.Filled.Settings
                         },
                         contentDescription = null,
                         tint = DarkPrimary,
@@ -92,13 +80,36 @@ fun CourseSelectionScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = DarkOnSurface.copy(alpha = 0.7f)
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "${course.totalLessons} lessons • ${course.completedLessons} completed",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DarkOnSurface.copy(alpha = 0.6f)
+                        )
                     }
                     Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = "${course.progress}%",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = DarkPrimary
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = "${course.progress}%",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = DarkPrimary
+                        )
+                        if (course.progress > 0) {
+                            Text(
+                                text = "In Progress",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF4CAF50)
+                            )
+                        } else {
+                            Text(
+                                text = "Not Started",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DarkOnSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
                 }
             }
         }

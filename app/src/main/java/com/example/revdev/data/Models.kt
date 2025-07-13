@@ -8,7 +8,6 @@ data class User(
     val name: String,
     val email: String,
     val profilePicture: String? = null,
-    val courseProgress: Map<String, Int> = emptyMap(),
     val quizHistory: List<QuizResult> = emptyList()
 )
 
@@ -46,7 +45,21 @@ data class Course(
     val description: String,
     val progress: Int = 0,
     val totalLessons: Int = 0,
-    val completedLessons: Int = 0
+    val completedLessons: Int = 0,
+    val lessons: List<Lesson> = emptyList(),
+    val category: CourseCategory = CourseCategory.WEB_DEVELOPMENT
+)
+
+@Immutable
+data class Lesson(
+    val id: String,
+    val title: String,
+    val description: String,
+    val content: String,
+    val codeExample: String? = null,
+    val isCompleted: Boolean = false,
+    val order: Int,
+    val type: LessonType = LessonType.TEXT
 )
 
 @Immutable
@@ -56,4 +69,18 @@ data class ResumeReview(
     val feedback: String,
     val score: Int,
     val date: Long
-) 
+)
+
+enum class CourseCategory {
+    WEB_DEVELOPMENT,
+    PROGRAMMING,
+    DESIGN,
+    DATABASE
+}
+
+enum class LessonType {
+    TEXT,
+    CODE,
+    QUIZ,
+    PRACTICAL
+} 
