@@ -1,4 +1,4 @@
-package com.example.revdev.data
+ package com.example.revdev.data
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -23,7 +23,7 @@ import kotlinx.serialization.json.jsonArray
 
 object OpenAIApi {
     private const val API_URL = "https://openrouter.ai/api/v1/chat/completions" // OpenRouter endpoint
-    private const val API_KEY = "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" // OpenRouter API key
+    private const val API_KEY = "" // OpenRouter API key
     private val client = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS) // Disable read timeout for streaming
         .build()
