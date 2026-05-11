@@ -75,7 +75,8 @@ enum class CourseCategory {
     WEB_DEVELOPMENT,
     PROGRAMMING,
     DESIGN,
-    DATABASE
+    DATABASE,
+    FULL_STACK
 }
 
 enum class LessonType {
@@ -83,4 +84,94 @@ enum class LessonType {
     CODE,
     QUIZ,
     PRACTICAL
+}
+
+@Immutable
+data class UserProgress(
+    val completedLessons: Set<String> = emptySet(),
+    val quizResults: List<QuizResult> = emptyList(),
+    val xp: Int = 0,
+    val level: Int = 1,
+    val streak: Int = 0,
+    val lastActiveDate: Long = 0L,
+    val badges: List<Badge> = emptyList()
+)
+
+@Immutable
+data class Badge(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: String,
+    val earnedDate: Long = 0L
+)
+
+enum class SkillLevel {
+    BEGINNER,
+    INTERMEDIATE,
+    ADVANCED
+}
+
+// Bug Hunt Mode
+@Immutable
+data class BugChallenge(
+    val id: String,
+    val title: String,
+    val description: String,
+    val brokenCode: String,
+    val hint: String,
+    val difficulty: BugDifficulty,
+    val language: String,
+    val xpReward: Int
+)
+
+enum class BugDifficulty { EASY, MEDIUM, HARD }
+
+// Skill Tree
+@Immutable
+data class SkillNode(
+    val id: String,
+    val title: String,
+    val description: String,
+    val category: SkillCategory,
+    val prerequisites: List<String> = emptyList(),
+    val courseId: String? = null,
+    val isUnlocked: Boolean = false,
+    val isCompleted: Boolean = false,
+    val xpReward: Int = 35
+)
+
+enum class SkillCategory { HTML, CSS, JAVASCRIPT, REACT, NODE, EXPRESS, MONGODB }
+
+// MERN Project Steps
+@Immutable
+data class ProjectStep(
+    val lessonId: String,
+    val track: MERNTrack,
+    val projectContext: String,
+    val expectedOutput: String,
+    val starterCode: String
+)
+
+enum class MERNTrack { MONGODB, EXPRESS, REACT, NODE }
+
+object XPRewards {
+    const val LESSON_COMPLETE = 25
+    const val QUIZ_PERFECT = 100
+    const val QUIZ_PASS = 50
+    const val DAILY_LOGIN = 10
+    const val STREAK_BONUS = 5
+    const val BUG_FIX_EASY = 15
+    const val BUG_FIX_MEDIUM = 30
+    const val BUG_FIX_HARD = 50
+    const val VOICE_QUIZ_CORRECT = 20
+    const val SKILL_NODE_UNLOCK = 35
+    const val MERN_STEP_COMPLETE = 30
+
+    fun levelFromXP(xp: Int): Int = (xp / 200) + 1
+    fun xpForNextLevel(level: Int): Int = level * 200
+    fun xpProgressInLevel(xp: Int): Float {
+        val currentLevelXP = xp % 200
+        return currentLevelXP / 200f
+    }
 } 

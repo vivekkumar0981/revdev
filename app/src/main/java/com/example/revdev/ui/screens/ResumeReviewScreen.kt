@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.revdev.data.ResumeReview
+import com.example.revdev.data.OpenAIApi
 import com.example.revdev.ui.components.*
 import com.example.revdev.ui.theme.*
 import kotlinx.coroutines.delay
@@ -33,6 +34,8 @@ fun ResumeReviewScreen(modifier: Modifier = Modifier) {
     var uploadedFile by remember { mutableStateOf<String?>(null) }
     var showFeedback by remember { mutableStateOf(false) }
     var feedback by remember { mutableStateOf<ResumeReview?>(null) }
+    var resumeText by remember { mutableStateOf("") }
+    var showTextInput by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     
     Column(
@@ -149,85 +152,92 @@ fun ResumeReviewScreen(modifier: Modifier = Modifier) {
                             
                             Spacer(modifier = Modifier.height(24.dp))
                             
-                            // Upload Area
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(120.dp)
-                                    .border(
-                                        width = 2.dp,
-                                        color = if (uploadedFile != null) DarkSuccess else DarkOutline,
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (uploadedFile != null) DarkSuccess.copy(alpha = 0.1f)
-                                        else DarkSurfaceVariant.copy(alpha = 0.3f)
-                                    )
-                                    .clickable {
-                                        if (!isUploading) {
-                                            uploadedFile = "resume.pdf"
-                                        }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (uploadedFile != null) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = DarkSuccess
+                            if (!showTextInput) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(120.dp)
+                                        .border(
+                                            width = 2.dp,
+                                            color = DarkOutline,
+                                            shape = RoundedCornerShape(12.dp)
                                         )
-                                        
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(DarkSurfaceVariant.copy(alpha = 0.3f))
+                                        .clickable { showTextInput = true },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(imageVector = Icons.Default.Edit, contentDescription = null, tint = DarkOnSurfaceVariant)
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        
-                                        Text(
-                                            text = uploadedFile!!,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = DarkSuccess
-                                        )
-                                    }
-                                } else {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Add,
-                                            contentDescription = null,
-                                            tint = DarkOnSurfaceVariant
-                                        )
-                                        
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        
-                                        Text(
-                                            text = "Tap to select file",
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = DarkOnSurfaceVariant
-                                        )
+                                        Text(text = "Tap to paste your resume text", style = MaterialTheme.typography.bodyMedium, color = DarkOnSurfaceVariant)
+                                        Text(text = "(or paste key sections)", style = MaterialTheme.typography.bodySmall, color = DarkOnSurfaceVariant.copy(alpha = 0.6f))
                                     }
                                 }
+                            } else {
+                                OutlinedTextField(
+                                    value = resumeText,
+                                    onValueChange = { resumeText = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp),
+                                    placeholder = { Text("Paste your resume content here...\n\nInclude: Summary, Experience, Skills, Education", color = DarkOnSurfaceVariant) },
+                                    shape = RoundedCornerShape(12.dp),
+                                    maxLines = 20
+                                )
                             }
                             
                             Spacer(modifier = Modifier.height(24.dp))
-                            
-                            PrimaryButton(
-                                text = if (isUploading) "Analyzing..." else "Get Feedback",
-                                onClick = {
-                                    if (uploadedFile != null && !isUploading) {
-                                        isUploading = true
-                                        coroutineScope.launch {
-                                            delay(3000) // Simulate analysis
-                                            feedback = generateResumeFeedback()
-                                            isUploading = false
-                                            showFeedback = true
+
+                            if (isUploading) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    CircularProgressIndicator(color = DarkPrimary)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text("AI analyzing your resume...", color = DarkOnSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                }
+                            } else {
+                                PrimaryButton(
+                                    text = "Get AI Feedback",
+                                    onClick = {
+                                        if (resumeText.isNotBlank() && !isUploading) {
+                                            isUploading = true
+                                            coroutineScope.launch {
+                                                try {
+                                                    val aiResponse = OpenAIApi.reviewResume(resumeText)
+                                                    feedback = ResumeReview(
+                                                        id = System.currentTimeMillis().toString(),
+                                                        fileName = "Pasted Resume",
+                                                        feedback = aiResponse,
+                                                        score = extractScoreFromResponse(aiResponse),
+                                                        date = System.currentTimeMillis()
+                                                    )
+                                                    showFeedback = true
+                                                } catch (e: Exception) {
+                                                    feedback = ResumeReview(
+                                                        id = "error",
+                                                        fileName = "Error",
+                                                        feedback = "Could not analyze resume: ${e.message}",
+                                                        score = 0,
+                                                        date = System.currentTimeMillis()
+                                                    )
+                                                    showFeedback = true
+                                                } finally {
+                                                    isUploading = false
+                                                }
+                                            }
                                         }
-                                    }
-                                },
-                                enabled = uploadedFile != null && !isUploading,
-                                icon = if (isUploading) null else Icons.Default.CheckCircle
-                            )
+                                    },
+                                    enabled = resumeText.length > 50,
+                                    icon = Icons.Default.CheckCircle
+                                )
+                                if (resumeText.isNotBlank() && resumeText.length <= 50) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text("Need at least 50 characters for meaningful review", color = DarkOnSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     
@@ -357,13 +367,15 @@ fun ResumeReviewScreen(modifier: Modifier = Modifier) {
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             SecondaryButton(
-                                text = "Upload New",
+                                text = "Review Another",
                                 onClick = {
                                     showFeedback = false
                                     uploadedFile = null
                                     feedback = null
+                                    resumeText = ""
+                                    showTextInput = false
                                 },
-                                icon = Icons.Default.Add,
+                                icon = Icons.Default.Refresh,
                                 modifier = Modifier.weight(1f)
                             )
                             
@@ -426,31 +438,9 @@ private fun FeatureRow(
     }
 }
 
-private fun generateResumeFeedback(): ResumeReview {
-    return ResumeReview(
-        id = "1",
-        fileName = "resume.pdf",
-        score = 78,
-        feedback = """
-            Your resume shows good structure and relevant experience. Here are the key areas for improvement:
-            
-            ✅ Strengths:
-            • Clear professional summary
-            • Good use of action verbs
-            • Relevant technical skills listed
-            
-            🔧 Areas to Improve:
-            • Add more quantifiable achievements
-            • Include specific project outcomes
-            • Consider adding a skills section with proficiency levels
-            • Ensure consistent formatting throughout
-            
-            💡 Recommendations:
-            • Use bullet points for better readability
-            • Include metrics where possible (e.g., "Increased efficiency by 25%")
-            • Add relevant certifications
-            • Consider adding a portfolio link
-        """.trimIndent(),
-        date = System.currentTimeMillis()
-    )
+private fun extractScoreFromResponse(response: String): Int {
+    val scoreRegex = Regex("""(\d{1,3})\s*/\s*100|score[:\s]*(\d{1,3})""", RegexOption.IGNORE_CASE)
+    val match = scoreRegex.find(response)
+    val score = match?.groupValues?.drop(1)?.firstOrNull { it.isNotBlank() }?.toIntOrNull()
+    return (score ?: 65).coerceIn(0, 100)
 } 

@@ -1,10 +1,16 @@
 package com.example.revdev.ui.screens
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -17,46 +23,46 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.revdev.data.ChatMessage
-import com.example.revdev.data.OpenAIApi
 import com.example.revdev.ui.components.*
 import com.example.revdev.ui.theme.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AITutorScreen(modifier: Modifier = Modifier) {
-    var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+fun AITutorScreen(modifier: Modifier = Modifier, viewModel: AITutorViewModel = viewModel()) {
+    val messages by viewModel.messages.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val streamingMessage by viewModel.streamingMessage.collectAsState()
+    val cooldownSeconds by viewModel.cooldownSeconds.collectAsState()
+
     var inputText by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var cooldownSeconds by remember { mutableStateOf(0) }
-    var streamingMessage by remember { mutableStateOf<String?>(null) }
+    var isListening by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val coroutineScope = rememberCoroutineScope()
-    
-    // Add welcome message
-    LaunchedEffect(Unit) {
-        messages = listOf(
-            ChatMessage(
-                id = "welcome",
-                content = "Hello! I'm your AI tutor. I'm here to help you with HTML, CSS, and web development. Feel free to ask me any questions!",
-                isUser = false
-            )
-        )
+
+    val speechLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        isListening = false
+        if (result.resultCode == Activity.RESULT_OK) {
+            val spoken = result.data
+                ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                ?.firstOrNull() ?: ""
+            if (spoken.isNotBlank()) {
+                inputText = if (inputText.isBlank()) spoken else "$inputText $spoken"
+            }
+        }
     }
 
-    // Cooldown timer effect
-    LaunchedEffect(cooldownSeconds) {
-        if (cooldownSeconds > 0) {
-            kotlinx.coroutines.delay(1000)
-            cooldownSeconds--
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
         }
     }
     
@@ -94,7 +100,7 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                     )
                     
                     Text(
-                        text = "Ask me anything about web development",
+                        text = "MERN stack, frontend, backend & more",
                         style = MaterialTheme.typography.bodyMedium,
                         color = DarkOnPrimary.copy(alpha = 0.8f)
                     )
@@ -129,7 +135,7 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                 ChatMessageItem(message = message)
             }
             
-            if (isLoading && streamingMessage != null) {
+            if (isLoading && !streamingMessage.isNullOrEmpty()) {
                 item {
                     ChatMessageItem(
                         message = ChatMessage(
@@ -179,57 +185,38 @@ fun AITutorScreen(modifier: Modifier = Modifier) {
                     maxLines = 4
                 )
                 
-                Spacer(modifier = Modifier.width(8.dp))
-                
+                Spacer(modifier = Modifier.width(4.dp))
+
+                IconButton(
+                    onClick = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(
+                                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+                            )
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask your question...")
+                        }
+                        isListening = true
+                        speechLauncher.launch(intent)
+                    },
+                    modifier = Modifier.size(48.dp),
+                    enabled = !isLoading
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice input",
+                        tint = if (isListening) DarkPrimary else DarkOnSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
                 FloatingActionButton(
                     onClick = {
                         if (!isLoading && cooldownSeconds == 0 && inputText.isNotBlank()) {
-                            val userMessage = ChatMessage(
-                                id = System.currentTimeMillis().toString(),
-                                content = inputText,
-                                isUser = true
-                            )
-                            messages = messages + userMessage
-                            val currentInput = inputText
+                            viewModel.sendMessage(inputText)
                             inputText = ""
-                            isLoading = true
-                            streamingMessage = ""
-                            coroutineScope.launch {
-                                try {
-                                    var lastText = ""
-                                    val aiResponse = OpenAIApi.askStream(currentInput) { partialText ->
-                                        streamingMessage = partialText
-                                        lastText = partialText
-                                    }
-                                    if (aiResponse.contains("Rate limit exceeded")) {
-                                        cooldownSeconds = 10 // 10 second cooldown
-                                        val errorMsg = ChatMessage(
-                                            id = System.currentTimeMillis().toString(),
-                                            content = "You are sending requests too quickly or have reached your usage limit. Please wait $cooldownSeconds seconds before trying again.",
-                                            isUser = false
-                                        )
-                                        messages = messages + errorMsg
-                                    } else {
-                                        val aiMessage = ChatMessage(
-                                            id = System.currentTimeMillis().toString(),
-                                            content = lastText,
-                                            isUser = false
-                                        )
-                                        messages = messages + aiMessage
-                                    }
-                                } catch (e: Exception) {
-                                    val errorMsg = ChatMessage(
-                                        id = System.currentTimeMillis().toString(),
-                                        content = "AI error: ${e.message}",
-                                        isUser = false
-                                    )
-                                    messages = messages + errorMsg
-                                } finally {
-                                    isLoading = false
-                                    streamingMessage = null
-                                    listState.animateScrollToItem(messages.size - 1)
-                                }
-                            }
                         }
                     },
                     modifier = Modifier.size(48.dp),
@@ -255,13 +242,14 @@ private fun ChatMessageItem(message: ChatMessage) {
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
     val backgroundColor = if (message.isUser) DarkPrimary else DarkCardBackground
     val textColor = if (message.isUser) DarkOnPrimary else DarkOnSurface
+    val maxWidthFraction = if (message.isUser) 0.75f else 0.9f
     
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
         Card(
-            modifier = Modifier.widthIn(max = 280.dp),
+            modifier = Modifier.fillMaxWidth(maxWidthFraction),
             colors = CardDefaults.cardColors(
                 containerColor = backgroundColor
             ),
@@ -300,12 +288,20 @@ private fun ChatMessageItem(message: ChatMessage) {
                     Spacer(modifier = Modifier.height(4.dp))
                 }
                 
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    textAlign = if (message.isUser) TextAlign.End else TextAlign.Start
-                )
+                if (message.isUser) {
+                    Text(
+                        text = message.content,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = textColor,
+                        textAlign = TextAlign.End
+                    )
+                } else {
+                    MarkdownText(
+                        text = message.content,
+                        color = textColor,
+                        textAlign = TextAlign.Start
+                    )
+                }
             }
         }
     }
@@ -313,8 +309,32 @@ private fun ChatMessageItem(message: ChatMessage) {
 
 @Composable
 private fun TypingIndicator() {
+    val infiniteTransition = rememberInfiniteTransition(label = "thinking")
+
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    val glowScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow"
+    )
+
     Card(
-        modifier = Modifier.widthIn(max = 280.dp),
+        modifier = Modifier
+            .fillMaxWidth(0.9f)
+            .graphicsLayer { scaleX = glowScale; scaleY = glowScale },
         colors = CardDefaults.cardColors(
             containerColor = DarkCardBackground
         ),
@@ -325,53 +345,77 @@ private fun TypingIndicator() {
             bottomEnd = 16.dp
         )
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.Email,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = DarkPrimary
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            Text(
-                text = "AI Tutor",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = DarkPrimary
-            )
-            
-            Spacer(modifier = Modifier.width(8.dp))
-            
-            // Animated dots
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                    tint = DarkPrimary.copy(alpha = pulseAlpha)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "AI Tutor is thinking",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = DarkPrimary.copy(alpha = pulseAlpha)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val dotColors = listOf(DarkPrimary, DarkSecondary, DarkGradientEnd)
                 repeat(3) { index ->
-                    val infiniteTransition = rememberInfiniteTransition()
-                    val alpha by infiniteTransition.animateFloat(
+                    val offsetY by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = -10f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(
+                                durationMillis = 500,
+                                delayMillis = index * 180,
+                                easing = FastOutSlowInEasing
+                            ),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "dot$index"
+                    )
+                    val dotAlpha by infiniteTransition.animateFloat(
                         initialValue = 0.3f,
                         targetValue = 1f,
                         animationSpec = infiniteRepeatable(
-                            animation = tween(600, delayMillis = index * 200),
+                            animation = tween(
+                                durationMillis = 500,
+                                delayMillis = index * 180
+                            ),
                             repeatMode = RepeatMode.Reverse
-                        )
+                        ),
+                        label = "dotAlpha$index"
                     )
-                    
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(12.dp)
+                            .offset(y = offsetY.dp)
                             .background(
-                                color = DarkPrimary.copy(alpha = alpha),
-                                shape = RoundedCornerShape(4.dp)
+                                color = dotColors[index].copy(alpha = dotAlpha),
+                                shape = RoundedCornerShape(6.dp)
                             )
                     )
                 }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                Text(
+                    text = "Generating response...",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = DarkOnSurfaceVariant.copy(alpha = pulseAlpha)
+                )
             }
         }
     }

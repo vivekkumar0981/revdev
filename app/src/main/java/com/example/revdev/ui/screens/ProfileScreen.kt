@@ -24,8 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.revdev.data.Course
+import com.example.revdev.data.CourseViewModel
 import com.example.revdev.data.QuizResult
 import com.example.revdev.data.User
+import com.example.revdev.data.UserProgress
+import com.example.revdev.data.XPRewards
 import com.example.revdev.ui.components.*
 import com.example.revdev.ui.theme.*
 import java.text.SimpleDateFormat
@@ -34,17 +37,16 @@ import com.example.revdev.data.AuthViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? = null) {
+fun ProfileScreen(
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel? = null,
+    courseViewModel: CourseViewModel? = null
+) {
     val firebaseUser = authViewModel?.currentUser
     val userName = firebaseUser?.displayName ?: "User"
     val userEmail = firebaseUser?.email ?: ""
-    
-    val courses = remember {
-        listOf(
-            Course("html_css", "HTML & CSS", "Learn the fundamentals of web development", 75, 20, 15),
-            Course("javascript", "JavaScript", "Master JavaScript programming", 30, 15, 5)
-        )
-    }
+    val progress = courseViewModel?.userProgress?.collectAsState()?.value
+    val courses = courseViewModel?.courses?.collectAsState()?.value ?: emptyList()
     
     Column(
         modifier = modifier
@@ -149,9 +151,9 @@ fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? =
                             .padding(vertical = 22.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatItem("Courses", courses.size.toString())
-                        StatItem("Quizzes", "0")
-                        StatItem("Avg Score", "0%")
+                        StatItem("Level", "${progress?.level ?: 1}")
+                        StatItem("XP", "${progress?.xp ?: 0}")
+                        StatItem("Streak", "${progress?.streak ?: 0}🔥")
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -171,42 +173,47 @@ fun ProfileScreen(modifier: Modifier = Modifier, authViewModel: AuthViewModel? =
             contentPadding = PaddingValues(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Course Progress Section
             item {
-                Text(
-                    text = "Course Progress",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = DarkOnBackground
-                )
+                val xpProgress = XPRewards.xpProgressInLevel(progress?.xp ?: 0)
+                val nextLevelXP = XPRewards.xpForNextLevel(progress?.level ?: 1)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = DarkCardBackground),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("XP Progress", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = DarkOnSurface)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ProgressBar(progress = xpProgress, color = DarkPrimary)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("${progress?.xp ?: 0} / $nextLevelXP XP to next level", style = MaterialTheme.typography.bodySmall, color = DarkOnSurfaceVariant)
+                    }
+                }
             }
-            
-            // items(courses) { course ->
-            //     CourseProgressCard(course = course)
-            // }
-            
-            // Quiz History Section
+
             item {
                 Text(
                     text = "Quiz History",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = DarkOnBackground
                 )
             }
-            // items(user.quizHistory) { quiz ->
-            //     QuizHistoryCard(quiz = quiz)
-            // }
+
+            val quizResults = progress?.quizResults ?: emptyList()
+            if (quizResults.isEmpty()) {
+                item {
+                    Text("No quizzes taken yet", style = MaterialTheme.typography.bodyMedium, color = DarkOnSurfaceVariant)
+                }
+            } else {
+                items(quizResults.takeLast(10).reversed()) { quiz ->
+                    QuizHistoryCard(quiz = quiz)
+                }
+            }
             
-            // Settings Section
             item {
                 Text(
                     text = "Settings",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                     color = DarkOnBackground
                 )
             }
@@ -339,51 +346,48 @@ private fun QuizHistoryCard(quiz: QuizResult) {
 
 @Composable
 private fun SettingsCard(onSignOut: () -> Unit) {
+    var darkMode by remember { mutableStateOf(true) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = DarkCardBackground
-        ),
+        colors = CardDefaults.cardColors(containerColor = DarkCardBackground),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp)
-        ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (darkMode) Icons.Default.Star else Icons.Default.Star,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(color = DarkPrimaryContainer, shape = RoundedCornerShape(8.dp))
+                            .padding(8.dp),
+                        tint = DarkOnPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text("Dark Mode", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = DarkOnSurface)
+                        Text("Toggle app theme", style = MaterialTheme.typography.bodyMedium, color = DarkOnSurfaceVariant)
+                    }
+                }
+                Switch(checked = darkMode, onCheckedChange = { darkMode = it })
+            }
+
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = DarkOutline)
+
+            SettingsRow(icon = Icons.Default.Notifications, title = "Notifications", subtitle = "Manage notification preferences")
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = DarkOutline)
+            SettingsRow(icon = Icons.Default.Settings, title = "Privacy", subtitle = "Control privacy settings")
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = DarkOutline)
+            SettingsRow(icon = Icons.Default.Home, title = "Help & Support", subtitle = "Get help and contact support")
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = DarkOutline)
             SettingsRow(
-                icon = Icons.Default.Notifications,
-                title = "Notifications",
-                subtitle = "Manage your notification preferences"
-            )
-            
-            Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = DarkOutline
-            )
-            
-            SettingsRow(
-                icon = Icons.Default.Settings,
-                title = "Privacy",
-                subtitle = "Control your privacy settings"
-            )
-            
-            Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = DarkOutline
-            )
-            
-            SettingsRow(
-                icon = Icons.Default.Home,
-                title = "Help & Support",
-                subtitle = "Get help and contact support"
-            )
-            
-            Divider(
-                modifier = Modifier.padding(vertical = 12.dp),
-                color = DarkOutline
-            )
-            
-            SettingsRow(
-                icon = Icons.Default.Settings,
+                icon = Icons.Default.ExitToApp,
                 title = "Sign Out",
                 subtitle = "Sign out of your account",
                 isDestructive = true,

@@ -1,5 +1,7 @@
 package com.example.revdev.ui.screens
 
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.example.revdev.data.Lesson
+import com.example.revdev.data.LessonType
 import com.example.revdev.ui.theme.*
 
 @Composable
@@ -33,7 +37,6 @@ fun LessonViewerScreen(
             .fillMaxSize()
             .background(DarkBackground)
     ) {
-        // Header
         LessonHeader(
             lesson = lesson,
             onNextLesson = onNextLesson,
@@ -42,7 +45,6 @@ fun LessonViewerScreen(
             hasPreviousLesson = hasPreviousLesson
         )
         
-        // Content
         LessonContent(
             lesson = lesson,
             onMarkCompleted = onMarkCompleted,
@@ -63,14 +65,10 @@ private fun LessonHeader(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = DarkCardBackground
-        ),
+        colors = CardDefaults.cardColors(containerColor = DarkCardBackground),
         shape = RoundedCornerShape(12.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = lesson.title,
                 style = MaterialTheme.typography.headlineSmall,
@@ -89,7 +87,6 @@ private fun LessonHeader(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Navigation buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -101,10 +98,7 @@ private fun LessonHeader(
                         containerColor = if (hasPreviousLesson) DarkPrimary else DarkPrimary.copy(alpha = 0.5f)
                     )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Previous lesson"
-                    )
+                    Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Previous")
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Previous")
                 }
@@ -118,10 +112,7 @@ private fun LessonHeader(
                 ) {
                     Text("Next")
                     Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Next lesson"
-                    )
+                    Icon(imageVector = Icons.Default.ArrowForward, contentDescription = "Next")
                 }
             }
         }
@@ -140,17 +131,12 @@ private fun LessonContent(
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // Lesson content
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = DarkCardBackground
-            ),
+            colors = CardDefaults.cardColors(containerColor = DarkCardBackground),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "Lesson Content",
                     style = MaterialTheme.typography.titleMedium,
@@ -160,7 +146,6 @@ private fun LessonContent(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Main content
                 Text(
                     text = lesson.content,
                     style = MaterialTheme.typography.bodyLarge,
@@ -168,7 +153,6 @@ private fun LessonContent(
                     lineHeight = MaterialTheme.typography.bodyLarge.lineHeight * 1.2
                 )
                 
-                // Code example if available
                 lesson.codeExample?.let { code ->
                     Spacer(modifier = Modifier.height(24.dp))
                     
@@ -183,19 +167,20 @@ private fun LessonContent(
                     
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = Color(0xFF1E1E1E)
-                        ),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
                             text = code,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontFamily = FontFamily.Monospace
-                            ),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                             color = Color(0xFFE0E0E0),
                             modifier = Modifier.padding(16.dp)
                         )
+                    }
+                    
+                    if (lesson.type == LessonType.CODE) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        CodePlayground(initialCode = code)
                     }
                 }
             }
@@ -203,13 +188,10 @@ private fun LessonContent(
         
         Spacer(modifier = Modifier.height(24.dp))
         
-        // Completion section
         if (!lesson.isCompleted) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = DarkCardBackground
-                ),
+                colors = CardDefaults.cardColors(containerColor = DarkCardBackground),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -222,31 +204,22 @@ private fun LessonContent(
                         color = DarkOnSurface,
                         textAlign = TextAlign.Center
                     )
-                    
                     Spacer(modifier = Modifier.height(12.dp))
-                    
                     Button(
                         onClick = onMarkCompleted,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = DarkPrimary
-                        ),
+                        colors = ButtonDefaults.buttonColors(containerColor = DarkPrimary),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Mark completed"
-                        )
+                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Mark completed")
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Complete Lesson")
+                        Text("Complete Lesson (+25 XP)")
                     }
                 }
             }
         } else {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFF1B5E20)
-                ),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1B5E20)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
@@ -254,21 +227,112 @@ private fun LessonContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Completed",
-                        tint = Color.White
-                    )
+                    Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Completed", tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Lesson Completed!",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = Color.White
-                    )
+                    Text(text = "Lesson Completed!", style = MaterialTheme.typography.titleMedium, color = Color.White)
                 }
             }
         }
         
         Spacer(modifier = Modifier.height(32.dp))
     }
-} 
+}
+
+@Composable
+private fun CodePlayground(initialCode: String) {
+    var userCode by remember { mutableStateOf(initialCode) }
+    var showPreview by remember { mutableStateOf(false) }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = DarkCardBackground),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Code Playground",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = DarkPrimary
+                )
+                
+                Button(
+                    onClick = { showPreview = !showPreview },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (showPreview) DarkSuccess else DarkPrimary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = if (showPreview) Icons.Default.Edit else Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(if (showPreview) "Edit" else "Run", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            if (showPreview) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    AndroidView(
+                        factory = { context ->
+                            WebView(context).apply {
+                                webViewClient = WebViewClient()
+                                settings.javaScriptEnabled = true
+                                loadDataWithBaseURL(null, userCode, "text/html", "UTF-8", null)
+                            }
+                        },
+                        update = { webView ->
+                            webView.loadDataWithBaseURL(null, userCode, "text/html", "UTF-8", null)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            } else {
+                OutlinedTextField(
+                    value = userCode,
+                    onValueChange = { userCode = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    textStyle = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFFE0E0E0)
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF1E1E1E),
+                        unfocusedContainerColor = Color(0xFF1E1E1E),
+                        focusedBorderColor = DarkPrimary,
+                        unfocusedBorderColor = DarkOutline
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Button(
+                onClick = { userCode = initialCode },
+                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceVariant),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Reset Code", style = MaterialTheme.typography.bodySmall, color = DarkOnSurface)
+            }
+        }
+    }
+}
