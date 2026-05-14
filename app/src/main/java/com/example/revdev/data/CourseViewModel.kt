@@ -14,9 +14,94 @@ class CourseViewModel : ViewModel() {
     
     private val _currentLesson = MutableStateFlow<Lesson?>(null)
     val currentLesson: StateFlow<Lesson?> = _currentLesson
-    
+
+    private val _userProgress = MutableStateFlow(UserProgress())
+    val userProgress: StateFlow<UserProgress> = _userProgress
+
+    private val _skillLevel = MutableStateFlow<SkillLevel?>(null)
+    val skillLevel: StateFlow<SkillLevel?> = _skillLevel
+
+    val totalCompletedLessons: Int
+        get() = _userProgress.value.completedLessons.size
+
+    val totalQuizzesTaken: Int
+        get() = _userProgress.value.quizResults.size
+
+    val averageQuizScore: Int
+        get() {
+            val results = _userProgress.value.quizResults
+            if (results.isEmpty()) return 0
+            return results.sumOf { (it.score * 100) / it.totalQuestions } / results.size
+        }
+
+    val overallProgress: Float
+        get() {
+            val totalLessons = _courses.value.sumOf { it.totalLessons }
+            if (totalLessons == 0) return 0f
+            return totalCompletedLessons.toFloat() / totalLessons
+        }
+
+    fun setSkillLevel(level: SkillLevel) {
+        _skillLevel.value = level
+    }
+
+    fun addXP(amount: Int) {
+        val current = _userProgress.value
+        val newXP = current.xp + amount
+        val newLevel = XPRewards.levelFromXP(newXP)
+        val newBadges = current.badges.toMutableList()
+        
+        if (newLevel > current.level) {
+            newBadges.add(Badge(
+                id = "level_$newLevel",
+                title = "Level $newLevel",
+                description = "Reached level $newLevel!",
+                icon = "star",
+                earnedDate = System.currentTimeMillis()
+            ))
+        }
+        
+        _userProgress.value = current.copy(
+            xp = newXP,
+            level = newLevel,
+            badges = newBadges
+        )
+    }
+
+    fun updateStreak() {
+        val current = _userProgress.value
+        val today = System.currentTimeMillis() / 86400000L
+        val lastActive = current.lastActiveDate / 86400000L
+        
+        val newStreak = when {
+            today == lastActive -> current.streak
+            today - lastActive == 1L -> current.streak + 1
+            else -> 1
+        }
+        
+        _userProgress.value = current.copy(
+            streak = newStreak,
+            lastActiveDate = System.currentTimeMillis()
+        )
+        
+        if (newStreak > 0) addXP(XPRewards.DAILY_LOGIN + (XPRewards.STREAK_BONUS * newStreak))
+    }
+
+    fun addQuizResult(result: QuizResult) {
+        val current = _userProgress.value
+        val updatedResults = current.quizResults + result
+        _userProgress.value = current.copy(quizResults = updatedResults)
+        
+        val scorePercent = (result.score * 100) / result.totalQuestions
+        when {
+            scorePercent == 100 -> addXP(XPRewards.QUIZ_PERFECT)
+            scorePercent >= 70 -> addXP(XPRewards.QUIZ_PASS)
+        }
+    }
+
     init {
         loadCourses()
+        updateStreak()
     }
     
     private fun loadCourses() {
@@ -689,7 +774,7 @@ img {
             )
         )
         
-        _courses.value = listOf(htmlCourse, cssCourse)
+        _courses.value = listOf(htmlCourse, cssCourse) + MERNCourseData.getMERNCourses()
     }
     
     fun selectCourse(courseId: String) {
@@ -704,29 +789,26 @@ img {
     fun markLessonAsCompleted(lessonId: String) {
         val course = _currentCourse.value ?: return
         val updatedLessons = course.lessons.map { lesson ->
-            if (lesson.id == lessonId) {
-                lesson.copy(isCompleted = true)
-            } else {
-                lesson
-            }
+            if (lesson.id == lessonId) lesson.copy(isCompleted = true) else lesson
         }
         
         val completedCount = updatedLessons.count { it.isCompleted }
         val updatedCourse = course.copy(
             lessons = updatedLessons,
             completedLessons = completedCount,
-            progress = if (course.totalLessons > 0) {
-                (completedCount * 100) / course.totalLessons
-            } else 0
+            progress = if (course.totalLessons > 0) (completedCount * 100) / course.totalLessons else 0
         )
         
         _currentCourse.value = updatedCourse
-        
-        // Update the course in the courses list
-        val updatedCourses = _courses.value.map { 
-            if (it.id == course.id) updatedCourse else it 
+        _courses.value = _courses.value.map { if (it.id == course.id) updatedCourse else it }
+
+        val current = _userProgress.value
+        if (lessonId !in current.completedLessons) {
+            _userProgress.value = current.copy(
+                completedLessons = current.completedLessons + lessonId
+            )
+            addXP(XPRewards.LESSON_COMPLETE)
         }
-        _courses.value = updatedCourses
     }
     
     fun getNextLesson(): Lesson? {

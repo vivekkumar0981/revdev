@@ -37,6 +37,7 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
+    object Onboarding : Screen("onboarding", "Welcome", Icons.Default.Star)
     object Login : Screen("login", "Login", Icons.Default.Person)
     object Home : Screen("home", "Home", Icons.Default.Home)
     object Quiz : Screen("quiz", "Quiz", Icons.Default.CheckCircle)
@@ -46,6 +47,9 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
     object CourseSelection : Screen("course_selection", "Courses", Icons.Default.Settings)
     object CourseDetail : Screen("course_detail/{courseId}", "Course Detail", Icons.Default.CheckCircle)
     object LessonViewer : Screen("lesson_viewer/{courseId}/{lessonId}", "Lesson", Icons.Default.Settings)
+    object BugHunt : Screen("bug_hunt", "Bug Hunt", Icons.Default.Build)
+    object VoiceLearning : Screen("voice_learning", "Voice", Icons.Default.Mic)
+    object SkillTree : Screen("skill_tree", "Skills", Icons.Default.Star)
 }
 
 val bottomNavItems = listOf(
@@ -61,6 +65,7 @@ fun RevdevNavigation() {
     val navController = rememberNavController()
     val authViewModel: AuthViewModel = viewModel()
     val courseViewModel: CourseViewModel = viewModel()
+    val aiTutorViewModel: AITutorViewModel = viewModel()
     val authState by authViewModel.authState.collectAsState()
     val courses by courseViewModel.courses.collectAsState()
     val currentCourse by courseViewModel.currentCourse.collectAsState()
@@ -71,12 +76,12 @@ fun RevdevNavigation() {
         authViewModel.checkAuth()
     }
 
-    // Navigation logic based on auth state
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
-                if (navController.currentDestination?.route != Screen.Home.route) {
-                    navController.navigate(Screen.Home.route) {
+                val dest = if (courseViewModel.skillLevel.value == null) Screen.Onboarding.route else Screen.Home.route
+                if (navController.currentDestination?.route != dest && navController.currentDestination?.route != Screen.Onboarding.route) {
+                    navController.navigate(dest) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                         launchSingleTop = true
                     }
@@ -111,8 +116,26 @@ fun RevdevNavigation() {
                     authViewModel = authViewModel,
                     onNavigateToSignUp = { navController.navigate("signup") },
                     onLoginSuccess = {
+                        if (courseViewModel.skillLevel.value == null) {
+                            navController.navigate(Screen.Onboarding.route) {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        } else {
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Login.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                )
+            }
+            composable(Screen.Onboarding.route) {
+                OnboardingScreen(
+                    onComplete = { level ->
+                        courseViewModel.setSkillLevel(level)
                         navController.navigate(Screen.Home.route) {
-                            popUpTo(Screen.Login.route) { inclusive = true }
+                            popUpTo(Screen.Onboarding.route) { inclusive = true }
                             launchSingleTop = true
                         }
                     }
@@ -137,10 +160,14 @@ fun RevdevNavigation() {
                 ) { modifier ->
                     HomeScreen(
                         authViewModel = authViewModel,
+                        courseViewModel = courseViewModel,
                         onNavigateToQuiz = { navController.navigate(route = Screen.Quiz.route) },
                         onNavigateToAITutor = { navController.navigate(route = Screen.AITutor.route) },
                         onNavigateToResumeReview = { navController.navigate(route = Screen.ResumeReview.route) },
                         onNavigateToCourseSelection = { navController.navigate(route = Screen.CourseSelection.route) },
+                        onNavigateToBugHunt = { navController.navigate(route = Screen.BugHunt.route) },
+                        onNavigateToVoiceLearning = { navController.navigate(route = Screen.VoiceLearning.route) },
+                        onNavigateToSkillTree = { navController.navigate(route = Screen.SkillTree.route) },
                         modifier = modifier
                     )
                 }
@@ -150,7 +177,7 @@ fun RevdevNavigation() {
                     navController = navController,
                     currentRoute = Screen.Quiz.route
                 ) { modifier ->
-                    QuizScreen(modifier = modifier)
+                    QuizScreen(modifier = modifier, courseViewModel = courseViewModel)
                 }
             }
             composable(Screen.AITutor.route) { 
@@ -158,7 +185,7 @@ fun RevdevNavigation() {
                     navController = navController,
                     currentRoute = Screen.AITutor.route
                 ) { modifier ->
-                    AITutorScreen(modifier = modifier)
+                    AITutorScreen(modifier = modifier, viewModel = aiTutorViewModel)
                 }
             }
             composable(Screen.ResumeReview.route) { 
@@ -174,7 +201,7 @@ fun RevdevNavigation() {
                     navController = navController,
                     currentRoute = Screen.Profile.route
                 ) { modifier ->
-                    ProfileScreen(modifier = modifier, authViewModel = authViewModel)
+                    ProfileScreen(modifier = modifier, authViewModel = authViewModel, courseViewModel = courseViewModel)
                 }
             }
             composable(Screen.CourseSelection.route) { 
@@ -268,13 +295,29 @@ fun RevdevNavigation() {
                         )
                     }
                 } else {
-                    // Handle lesson not found
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text("Lesson not found")
                     }
+                }
+            }
+            composable(Screen.BugHunt.route) {
+                MainScreen(navController = navController, currentRoute = Screen.BugHunt.route) { mod ->
+                    BugHuntScreen(modifier = mod, courseViewModel = courseViewModel)
+                }
+            }
+            composable(Screen.VoiceLearning.route) {
+                MainScreen(navController = navController, currentRoute = Screen.VoiceLearning.route) { mod ->
+                    VoiceLearningScreen(modifier = mod, courseViewModel = courseViewModel)
+                }
+            }
+            composable(Screen.SkillTree.route) {
+                MainScreen(navController = navController, currentRoute = Screen.SkillTree.route) { mod ->
+                    SkillTreeScreen(modifier = mod, courseViewModel = courseViewModel, onNavigateToCourse = { courseId ->
+                        navController.navigate("course_detail/$courseId")
+                    })
                 }
             }
         }

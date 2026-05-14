@@ -26,13 +26,25 @@ import com.example.revdev.data.AuthViewModel
 @Composable
 fun HomeScreen(
     authViewModel: AuthViewModel,
+    courseViewModel: com.example.revdev.data.CourseViewModel? = null,
     onNavigateToQuiz: () -> Unit,
     onNavigateToAITutor: () -> Unit,
     onNavigateToResumeReview: () -> Unit,
     onNavigateToCourseSelection: () -> Unit,
+    onNavigateToBugHunt: () -> Unit = {},
+    onNavigateToVoiceLearning: () -> Unit = {},
+    onNavigateToSkillTree: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val userName = authViewModel.currentUser?.displayName ?: "User"
+    val progress = courseViewModel?.userProgress?.collectAsState()?.value
+    val completedLessons = courseViewModel?.totalCompletedLessons ?: 0
+    val quizzesTaken = courseViewModel?.totalQuizzesTaken ?: 0
+    val avgScore = courseViewModel?.averageQuizScore ?: 0
+    val overallProgress = courseViewModel?.overallProgress ?: 0f
+    val xp = progress?.xp ?: 0
+    val level = progress?.level ?: 1
+    val streak = progress?.streak ?: 0
     
     Column(
         modifier = modifier
@@ -112,12 +124,12 @@ fun HomeScreen(
                         Column(
                             modifier = Modifier.padding(16.dp)
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                                 Text(
-                                    text = "Today's Progress",
+                                    text = "Level $level · ${streak}🔥 streak",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.SemiBold
                                     ),
@@ -125,7 +137,7 @@ fun HomeScreen(
                                 )
                                 
                                 Text(
-                                    text = "75%",
+                                    text = "${(overallProgress * 100).toInt()}%",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold
                                     ),
@@ -136,14 +148,14 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             ProgressBar(
-                                progress = 0.75f,
+                                progress = overallProgress,
                                 color = DarkOnPrimary
                             )
                             
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             Text(
-                                text = "3 of 4 daily goals completed",
+                                text = "${xp} XP · $completedLessons lessons completed",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = DarkOnPrimary.copy(alpha = 0.8f)
                             )
@@ -205,6 +217,27 @@ fun HomeScreen(
                         icon = Icons.Default.Add,
                         onClick = onNavigateToResumeReview
                     )
+
+                    FeatureCard(
+                        title = "Bug Hunt",
+                        description = "Find & fix bugs in broken code",
+                        icon = Icons.Default.Build,
+                        onClick = onNavigateToBugHunt
+                    )
+
+                    FeatureCard(
+                        title = "Voice Learning",
+                        description = "Learn hands-free with voice",
+                        icon = Icons.Default.Mic,
+                        onClick = onNavigateToVoiceLearning
+                    )
+
+                    FeatureCard(
+                        title = "Skill Tree",
+                        description = "RPG-style learning path",
+                        icon = Icons.Default.Star,
+                        onClick = onNavigateToSkillTree
+                    )
                 }
             }
             
@@ -235,21 +268,21 @@ fun HomeScreen(
                     ) {
                         StatCard(
                             title = "Lessons",
-                            value = "12",
+                            value = "$completedLessons",
                             subtitle = "Completed",
                             modifier = Modifier.weight(1f)
                         )
                         
                         StatCard(
                             title = "Quizzes",
-                            value = "8",
+                            value = "$quizzesTaken",
                             subtitle = "Taken",
                             modifier = Modifier.weight(1f)
                         )
                         
                         StatCard(
                             title = "Score",
-                            value = "85%",
+                            value = "${avgScore}%",
                             subtitle = "Average",
                             modifier = Modifier.weight(1f)
                         )
